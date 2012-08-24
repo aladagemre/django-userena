@@ -44,7 +44,7 @@ class UserenaManager(UserManager):
 
         :param active:
             Boolean that defines if the user requires activation by clicking 
-            on a link in an e-mail. Defauts to ``True``.
+            on a link in an e-mail. Defaults to ``False``.
 
         :param send_email:
             Boolean that defines if the user should be send an email. You could
@@ -100,15 +100,12 @@ class UserenaManager(UserManager):
         return self.create(user=user,
                            activation_key=activation_key)
 
-    def activate_user(self, username, activation_key):
+    def activate_user(self, activation_key):
         """
         Activate an :class:`User` by supplying a valid ``activation_key``.
 
         If the key is valid and an user is found, activates the user and
         return it. Also sends the ``activation_complete`` signal.
-
-        :param username:
-            String containing the username that wants to be activated.
 
         :param activation_key:
             String containing the secret SHA1 for a valid activation.
@@ -119,8 +116,7 @@ class UserenaManager(UserManager):
         """
         if SHA1_RE.search(activation_key):
             try:
-                userena = self.get(user__username=username,
-                                   activation_key=activation_key)
+                userena = self.get(activation_key=activation_key)
             except self.model.DoesNotExist:
                 return False
             if not userena.activation_key_expired():
@@ -137,7 +133,7 @@ class UserenaManager(UserManager):
                 return user
         return False
 
-    def confirm_email(self, username, confirmation_key):
+    def confirm_email(self, confirmation_key):
         """
         Confirm an email address by checking a ``confirmation_key``.
 
@@ -145,10 +141,6 @@ class UserenaManager(UserManager):
         address as the current e-mail address. Returns the user after
         success or ``False`` when the confirmation key is
         invalid. Also sends the ``confirmation_complete`` signal.
-
-        :param username:
-            String containing the username of the user that wants their email
-            verified.
 
         :param confirmation_key:
             String containing the secret SHA1 that is used for verification.
@@ -159,8 +151,7 @@ class UserenaManager(UserManager):
         """
         if SHA1_RE.search(confirmation_key):
             try:
-                userena = self.get(user__username=username,
-                                   email_confirmation_key=confirmation_key,
+                userena = self.get(email_confirmation_key=confirmation_key,
                                    email_unconfirmed__isnull=False)
             except self.model.DoesNotExist:
                 return False
@@ -224,25 +215,26 @@ class UserenaManager(UserManager):
                                               codename=perm[0],
                                               content_type=model_content_type)
 
+        # it is safe to rely on settings.ANONYMOUS_USER_ID since it is a requirement of 
+        # django-guardian
         for user in User.objects.exclude(id=settings.ANONYMOUS_USER_ID):
-            if not user.username == 'AnonymousUser':
-                try:
-                    user_profile = user.get_profile()
-                except get_profile_model().DoesNotExist:
-                    warnings.append(_("No profile found for %(username)s") \
-                                        % {'username': user.username})
-                else:
-                    all_permissions = get_perms(user, user_profile) + get_perms(user, user)
+            try:
+                user_profile = user.get_profile()
+            except get_profile_model().DoesNotExist:
+                warnings.append(_("No profile found for %(username)s") \
+                                    % {'username': user.username})
+            else:
+                all_permissions = get_perms(user, user_profile) + get_perms(user, user)
 
-                    for model, perms in ASSIGNED_PERMISSIONS.items():
-                        if model == 'profile':
-                            perm_object = user.get_profile()
-                        else: perm_object = user
+                for model, perms in ASSIGNED_PERMISSIONS.items():
+                    if model == 'profile':
+                        perm_object = user.get_profile()
+                    else: perm_object = user
 
-                        for perm in perms:
-                            if perm[0] not in all_permissions:
-                                assign(perm[0], user, perm_object)
-                                changed_users.append(user)
+                    for perm in perms:
+                        if perm[0] not in all_permissions:
+                            assign(perm[0], user, perm_object)
+                            changed_users.append(user)
 
         return (changed_permissions, changed_users, warnings)
 
