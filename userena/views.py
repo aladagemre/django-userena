@@ -9,6 +9,8 @@ from django.conf import settings
 from django.contrib import messages
 from django.utils.translation import ugettext as _
 from django.http import HttpResponseForbidden, Http404
+from django.utils import translation
+
 
 from userena.forms import (SignupForm, SignupFormOnlyEmail, AuthenticationForm,
                            ChangeEmailForm, EditProfileForm)
@@ -20,6 +22,7 @@ from userena import signals as userena_signals
 from userena import settings as userena_settings
 
 from guardian.decorators import permission_required_or_403
+from accounts.models import Language
 
 #============= Class based views =====================
 from django.views.generic import TemplateView
@@ -36,7 +39,9 @@ class ExtraContextTemplateView(TemplateView):
         if self.extra_context:
             context.update(self.extra_context)
         return context
-        
+    # this view is used in POST requests, e.g. signup when the form is not valid
+    post = TemplateView.get
+     
 class ProfileListView(ListView):
     """Replacement for profile_list function view."""
     context_object_name='profile_list'
@@ -344,7 +349,8 @@ def signin(request, auth_form=AuthenticationForm,
                 if userena_settings.USERENA_USE_MESSAGES:
                     messages.success(request, _('You have been signed in.'),
                                      fail_silently=True)
-
+                # Set language
+                request.session['django_language'] = user.get_profile().language.code
                 # Whereto now?
                 redirect_to = redirect_signin_function(
                     request.REQUEST.get(redirect_field_name), user)
@@ -358,6 +364,7 @@ def signin(request, auth_form=AuthenticationForm,
         'form': form,
         'next': request.REQUEST.get(redirect_field_name),
     })
+    
     return ExtraContextTemplateView.as_view(template_name=template_name,
                                             extra_context=extra_context)(request)
 
@@ -571,14 +578,18 @@ def profile_edit(request, username, edit_profile_form=EditProfileForm,
     if request.method == 'POST':
         form = edit_profile_form(request.POST, request.FILES, instance=profile,
                                  initial=user_initial)
-
+        
         if form.is_valid():
             profile = form.save()
 
             if userena_settings.USERENA_USE_MESSAGES:
                 messages.success(request, _('Your profile has been updated.'),
                                  fail_silently=True)
-
+            
+            # update language
+            l = Language.objects.get(id=int(request.POST['language']))
+            request.session['django_language'] = l.code
+            
             if success_url: redirect_to = success_url
             else: redirect_to = reverse('userena_profile_detail', kwargs={'username': username})
             return redirect(redirect_to)
@@ -622,67 +633,3 @@ def profile_detail(
     extra_context['hide_email'] = userena_settings.USERENA_HIDE_EMAIL
     return ExtraContextTemplateView.as_view(template_name=template_name,
                                             extra_context=extra_context)(request)
-
-def profile_list(request, page=1, template_name='userena/profile_list.html',
-                 paginate_by=50, extra_context=None, **kwargs):
-    """
-    DEPRECATED
-    Returns a list of all profiles that are public.
-
-    It's possible to disable this by changing ``USERENA_DISABLE_PROFILE_LIST``
-    to ``True`` in your settings.
-
-    :param page:
-        Integer of the active page used for pagination. Defaults to the first
-        page.
-
-    :param template_name:
-        String defining the name of the template that is used to render the
-        list of all users. Defaults to ``userena/list.html``.
-
-    :param paginate_by:
-        Integer defining the amount of displayed profiles per page. Defaults to
-        50 profiles per page.
-
-    :param extra_context:
-        Dictionary of variables that are passed on to the ``template_name``
-        template.
-
-    **Context**
-
-    ``profile_list``
-        A list of profiles.
-
-    ``is_paginated``
-        A boolean representing whether the results are paginated.
-
-    If the result is paginated. It will also contain the following variables.
-
-    ``paginator``
-        An instance of ``django.core.paginator.Paginator``.
-
-    ``page_obj``
-        An instance of ``django.core.paginator.Page``.
-
-    """
-    try:
-        page = int(request.GET.get('page', None))
-    except (TypeError, ValueError):
-        page = page
-
-    if userena_settings.USERENA_DISABLE_PROFILE_LIST \
-       and not request.user.is_staff:
-        raise Http404
-
-    profile_model = get_profile_model()
-    queryset = profile_model.objects.get_visible_profiles(request.user)
-
-    if not extra_context: extra_context = dict()
-    return list_detail.object_list(request,
-                                   queryset=queryset,
-                                   paginate_by=paginate_by,
-                                   page=page,
-                                   template_name=template_name,
-                                   extra_context=extra_context,
-                                   template_object_name='profile',
-                                   **kwargs)

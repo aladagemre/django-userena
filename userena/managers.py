@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.contrib.auth.models import User, UserManager, Permission, AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import ugettext as _
+from django.conf import settings
 
 from userena import settings as userena_settings
 from userena.utils import generate_sha1, get_profile_model, get_datetime_now
@@ -223,7 +224,7 @@ class UserenaManager(UserManager):
                                               codename=perm[0],
                                               content_type=model_content_type)
 
-        for user in User.objects.all():
+        for user in User.objects.exclude(id=settings.ANONYMOUS_USER_ID):
             if not user.username == 'AnonymousUser':
                 try:
                     user_profile = user.get_profile()

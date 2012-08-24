@@ -3,6 +3,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.utils.hashcompat import sha_constructor
+from django.contrib.admin import widgets 
 
 from userena import settings as userena_settings
 from userena.models import UserenaSignup
@@ -220,10 +221,11 @@ class EditProfileForm(forms.ModelForm):
         new_order.insert(0, 'first_name')
         new_order.insert(1, 'last_name')
         self.fields.keyOrder = new_order
-
+        self.fields['birthday'].widget = widgets.AdminDateWidget()
+        
     class Meta:
         model = get_profile_model()
-        exclude = ['user']
+        exclude = ['user', 'mugshot', 'points']
 
     def save(self, force_insert=False, force_update=False, commit=True):
         profile = super(EditProfileForm, self).save(commit=commit)
