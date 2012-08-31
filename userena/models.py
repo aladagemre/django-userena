@@ -1,3 +1,4 @@
+import smtplib
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
@@ -192,10 +193,19 @@ class UserenaSignup(models.Model):
 
         message = render_to_string('userena/emails/activation_email_message.txt',
                                    context)
-        send_mail(subject,
+        # EMRE Modified this to use smtplib. This method doesn't work.
+        """send_mail(subject,
                   message,
                   settings.DEFAULT_FROM_EMAIL,
-                  [self.user.email,])
+                  [self.user.email,])"""
+
+        msg = ("From: %s\r\nTo: %s\r\nSubject:%s\r\n\r\n%s\r\n"
+               % (settings.DEFAULT_FROM_EMAIL, self.user.email, subject, message))
+
+        server = smtplib.SMTP_SSL(settings.EMAIL_HOST, settings.EMAIL_PORT)
+        server.login(settings.EMAIL_USER, settings.EMAIL_HOST_PASSWORD)
+        server.sendmail(settings.DEFAULT_FROM_EMAIL, (self.user.email,), msg)
+        server.quit()
 
 class UserenaBaseProfile(models.Model):
     """ Base model needed for extra profile functionality """
