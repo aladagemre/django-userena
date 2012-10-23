@@ -242,7 +242,7 @@ msgstr "Tarih/zaman"
 #: contrib/umessages/fields.py:56
 #, python-format
 msgid "The following usernames are incorrect: %(users)s."
-msgstr "Şu kullanıcı adları doğru değil: %(user)s."
+msgstr "Şu kullanıcı adları doğru değil: %(users)s."
 
 #: contrib/umessages/forms.py:10
 msgid "To"

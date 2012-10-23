@@ -23,6 +23,7 @@ class SignupForm(forms.Form):
     Also requires the password to be entered twice.
 
     """
+
     username = forms.RegexField(regex=USERNAME_RE,
                                 max_length=30,
                                 widget=forms.TextInput(attrs=attrs_dict),
